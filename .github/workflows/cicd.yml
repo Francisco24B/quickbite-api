@@ -22,7 +22,7 @@ jobs:
           pip install pytest flake8 safety
 
       - run: flake8 app --max-line-length=100
-      - run: pytest tests
+      - run: python -m pytest tests
       - run: safety check || true
 
   build:
