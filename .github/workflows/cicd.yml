@@ -1,0 +1,75 @@
+
+name: QuickBite Full CI/CD
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: |
+          pip install -r requirements.txt
+          pip install pytest flake8 safety
+
+      - run: flake8 app --max-line-length=100
+      - run: pytest tests
+      - run: safety check
+
+  build:
+    needs: ci
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: echo "VERSION=$(cat VERSION)" >> $GITHUB_ENV
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/quickbite-api:${{ env.VERSION }} .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/quickbite-api:${{ env.VERSION }}
+
+  deploy-staging:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            export DOCKER_USER=${{ secrets.DOCKERHUB_USERNAME }}
+            cd quickbite
+            ./scripts/deploy.sh
+
+  deploy-production:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            export DOCKER_USER=${{ secrets.DOCKERHUB_USERNAME }}
+            cd quickbite
+            ./scripts/deploy.sh
