@@ -45,6 +45,7 @@ jobs:
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/quickbite-api:${{ env.VERSION }}
 
   deploy-staging:
+    if: false
     needs: build
     runs-on: ubuntu-latest
 
@@ -60,6 +61,7 @@ jobs:
             ./scripts/deploy.sh
 
   deploy-production:
+    if: false
     needs: deploy-staging
     runs-on: ubuntu-latest
 
